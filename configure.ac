@@ -64,6 +64,23 @@ AS_IF([test "x${enable_trace}" = "xyes" ],
        AC_MSG_RESULT(no)])
 AC_DEFINE_UNQUOTED([OFI_NCCL_TRACE], [${trace}], [Defined to 1 if aws-ofi-nccl was configured with --enable-trace, 0 otherwise])
 
+AC_ARG_ENABLE(usdt, [AS_HELP_STRING([--enable-usdt], [Enable USDT tracepoint support])], [], [enable_usdt=check])
+AS_IF([test "x${enable_usdt}" = "xno" ],
+      [usdt=0
+       AC_MSG_CHECKING([whether to enable USDT tracepoints])
+       AC_MSG_RESULT(no)],
+      [AC_CHECK_HEADER([sys/sdt.h],
+       [usdt=1
+        AC_MSG_CHECKING([whether to enable USDT tracepoints])
+        AC_MSG_RESULT(yes)],
+       [AS_IF([test "x${enable_usdt}" = "xyes" ],
+        [AC_MSG_ERROR([USDT support needs sys/sdt.h header])],
+        [usdt=0
+         AC_MSG_CHECKING([whether to enable USDT tracepoints])
+         AC_MSG_RESULT(no)])]
+       )])
+AC_DEFINE_UNQUOTED([OFI_NCCL_USDT], [${usdt}], [Defined to 1 if aws-ofi-nccl was configured with --enable-usdt, 0 otherwise])
+
 # Checks for header files.
 AC_CHECK_HEADERS([limits.h stdlib.h string.h unistd.h rdma/fabric.h cuda_runtime.h], [],[
 	AC_MSG_ERROR([unable to find required headers])

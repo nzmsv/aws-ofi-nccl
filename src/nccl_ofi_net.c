@@ -1,3 +1,5 @@
+#include "config.h"
+
 /* Instead of declaring one single NIC, declare one NIC close to each GPU */
 #define EFA_NIC_DUP
 
@@ -18,6 +20,21 @@
 #define IS_EFA_PROVIDER(NAME) (strcmp((NAME), EFA_PROVIDER_NAME)==0)
 #include <ctype.h>
 #include <cuda_runtime.h>
+#endif
+
+#if OFI_NCCL_USDT
+#include <sys/sdt.h>
+#define USDT_PROBE1(name, a1) DTRACE_PROBE1(ofi_nccl, name, a1)
+#define USDT_PROBE2(name, a1, a2) DTRACE_PROBE2(ofi_nccl, name, a1, a2)
+#define USDT_PROBE3(name, a1, a2, a3) DTRACE_PROBE3(ofi_nccl, name, a1, a2, a3)
+#define USDT_PROBE4(name, a1, a2, a3, a4) DTRACE_PROBE4(ofi_nccl, name, a1, a2, a3, a4)
+#define USDT_PROBE5(name, a1, a2, a3, a4, a5) DTRACE_PROBE5(ofi_nccl, name, a1, a2, a3, a4, a5)
+#else
+#define USDT_PROBE1(name, a1)
+#define USDT_PROBE2(name, a1, a2)
+#define USDT_PROBE3(name, a1, a2, a3)
+#define USDT_PROBE4(name, a1, a2, a3, a4)
+#define USDT_PROBE5(name, a1, a2, a3, a4, a5)
 #endif
 
 /* NICs info list for a provider */
@@ -459,6 +476,8 @@ static ncclResult_t register_mr_buffers(ofiComm_t *comm, void *data,
 			goto exit;
 		}
 	}
+
+	USDT_PROBE4(reg_mr, comm->dev, comm->local_ep_addr, type, size);
 
 	rc = fi_mr_regattr(nccl_ofi_component[comm->dev]->domain,
 			    &mr_attr, 0, mr_handle);
@@ -1558,6 +1577,8 @@ static ncclResult_t ofi_connect(int dev, void *handle, void **sendComm)
 	sComm->remote_ep = remote_addr;
 	sComm->dev = dev;
 
+	USDT_PROBE3(send_comm, sComm->dev, sComm->local_ep_addr, sComm->remote_ep);
+
 	/* Pre-allocated buffers for data path */
 	ret = allocate_ofi_fl(&sComm->nccl_ofi_reqs_fl, NCCL_OFI_MAX_REQUESTS,
 			      req_size);
@@ -1745,6 +1766,8 @@ static ncclResult_t ofi_accept(void *listenComm, void **recvComm)
 	rComm->remote_ep = remote_ep;
 	rComm->dev = dev;
 
+	USDT_PROBE3(recv_comm, rComm->dev, rComm->local_ep_addr, rComm->remote_ep);
+
 	if (support_gdr) {
 		rComm->flush_buff.size = sizeof(rComm->flush_buff.host_buffer);
 
@@ -1918,12 +1941,16 @@ static ncclResult_t ofi_isend(void *sendComm, void* data, int size,
 
 	sComm->num_inflight_reqs++;
 
+	USDT_PROBE5(isend, sComm->dev, sComm->local_ep_addr, sComm->remote_ep, size, sComm->num_inflight_reqs);
+
 	/* Return request to NCCL */
 	*request = req;
 
 	goto exit;
 
 error:
+	if (sComm)
+		USDT_PROBE4(isend_error, sComm->dev, sComm->local_ep_addr, sComm->remote_ep, size);
 	if (req)
 		free_nccl_ofi_req(req, false);
 exit:
@@ -1992,12 +2019,16 @@ static ncclResult_t ofi_irecv(void* recvComm, void* data, int size,
 
 	rComm->num_inflight_reqs++;
 
+	USDT_PROBE5(irecv, rComm->dev, rComm->local_ep_addr, rComm->remote_ep, size, rComm->num_inflight_reqs);
+
 	/* Return request to NCCL */
 	*request = req;
 
 	goto exit;
 
 error:
+	if (rComm)
+		USDT_PROBE4(irecv_error, rComm->dev, rComm->local_ep_addr, rComm->remote_ep, size);
 	if (req)
 		free_nccl_ofi_req(req, false);
 exit:
