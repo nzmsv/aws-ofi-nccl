@@ -7,6 +7,17 @@
 * Ubuntu 18.04 and 20.04 LTS
 * CentOS 7 and 8
 
+# v1.1.4 release notes
+
+Starting with this release, version compatibility information for Libfabric and NCCL will be maintained
+on the [Releases](https://github.com/aws/aws-ofi-nccl/releases) page.
+
+New Features:
+* Print version during plugin initialization
+
+Bug Fixes:
+* Print correct error code when failing to register a memory region
+
 # v1.1.3 release notes
 
 This release requires [Libfabric v1.11.0](https://github.com/ofiwg/libfabric/releases/tag/v1.11.0)
