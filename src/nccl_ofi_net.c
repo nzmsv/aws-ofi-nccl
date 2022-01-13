@@ -446,6 +446,10 @@ static ncclResult_t register_mr_buffers(ofiComm_t *comm, void *data,
 	iov.iov_base = data;
 	iov.iov_len = size;
 
+	if (((uintptr_t)data & 4095) || (size & 4095)) {
+		NCCL_OFI_WARN("Unaligned MR registration (data: %p, size: %d)", data, size);
+	}
+
 	/* Initialize MR attributes */
 	mr_attr.mr_iov = &iov;
 	mr_attr.iov_count = 1;
