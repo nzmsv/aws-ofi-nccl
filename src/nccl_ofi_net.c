@@ -29,12 +29,14 @@
 #define USDT_PROBE3(name, a1, a2, a3) DTRACE_PROBE3(ofi_nccl, name, a1, a2, a3)
 #define USDT_PROBE4(name, a1, a2, a3, a4) DTRACE_PROBE4(ofi_nccl, name, a1, a2, a3, a4)
 #define USDT_PROBE5(name, a1, a2, a3, a4, a5) DTRACE_PROBE5(ofi_nccl, name, a1, a2, a3, a4, a5)
+#define USDT_PROBE6(name, a1, a2, a3, a4, a5, a6) DTRACE_PROBE5(ofi_nccl, name, a1, a2, a3, a4, a5, a6)
 #else
 #define USDT_PROBE1(name, a1)
 #define USDT_PROBE2(name, a1, a2)
 #define USDT_PROBE3(name, a1, a2, a3)
 #define USDT_PROBE4(name, a1, a2, a3, a4)
 #define USDT_PROBE5(name, a1, a2, a3, a4, a5)
+#define USDT_PROBE6(name, a1, a2, a3, a4, a5, a6)
 #endif
 
 /* NICs info list for a provider */
@@ -477,10 +479,10 @@ static ncclResult_t register_mr_buffers(ofiComm_t *comm, void *data,
 		}
 	}
 
-	USDT_PROBE4(reg_mr, comm->dev, comm->local_ep_addr, type, size);
-
 	rc = fi_mr_regattr(nccl_ofi_component[comm->dev]->domain,
 			    &mr_attr, 0, mr_handle);
+	USDT_PROBE5(reg_mr, comm->dev, comm->local_ep_addr, type, size, mr_handle);
+
 	if (OFI_UNLIKELY(rc != 0)) {
 		NCCL_OFI_WARN("Unable to register memory (type = %d) for device %d. RC: %d, Error: %s",
 			       type, comm->dev, rc, fi_strerror(-rc));
@@ -930,6 +932,8 @@ static inline ncclResult_t process_completions(
 				req->lComm->accepted = true;
 			}
 		}
+
+		USDT_PROBE1(comp, req);
 	}
 
 exit:
@@ -985,6 +989,8 @@ static ncclResult_t ofi_process_cq(nccl_ofi_t *nccl_ofi_comp)
 					   nccl_ofi_req_t, ctx);
 			req->state = NCCL_OFI_REQ_ERROR;
 			req->size = err_buffer.len;
+
+			USDT_PROBE1(comp_err, req);
 		}
 		else if (rc == -FI_EAGAIN) {
 			/* No completions to process */
@@ -1857,6 +1863,8 @@ static ncclResult_t ofi_deregMr(void *comm, void *mhandle)
 		goto exit;
 	}
 
+	USDT_PROBE1(dereg_mr, mr_handle);
+
 	rc = fi_close((fid_t)mr_handle);
 	if (OFI_UNLIKELY(rc != 0)) {
 		ret = ncclSystemError;
@@ -1941,7 +1949,7 @@ static ncclResult_t ofi_isend(void *sendComm, void* data, int size,
 
 	sComm->num_inflight_reqs++;
 
-	USDT_PROBE5(isend, sComm->dev, sComm->local_ep_addr, sComm->remote_ep, size, sComm->num_inflight_reqs);
+	USDT_PROBE6(isend, sComm->dev, sComm->local_ep_addr, sComm->remote_ep, size, sComm->num_inflight_reqs, req);
 
 	/* Return request to NCCL */
 	*request = req;
@@ -2019,7 +2027,7 @@ static ncclResult_t ofi_irecv(void* recvComm, void* data, int size,
 
 	rComm->num_inflight_reqs++;
 
-	USDT_PROBE5(irecv, rComm->dev, rComm->local_ep_addr, rComm->remote_ep, size, rComm->num_inflight_reqs);
+	USDT_PROBE6(irecv, rComm->dev, rComm->local_ep_addr, rComm->remote_ep, size, rComm->num_inflight_reqs, req);
 
 	/* Return request to NCCL */
 	*request = req;
