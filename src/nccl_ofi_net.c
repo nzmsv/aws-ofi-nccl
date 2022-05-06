@@ -21,6 +21,7 @@
 #define IS_EFA_PROVIDER(NAME) (strcmp((NAME), EFA_PROVIDER_NAME)==0)
 #include <ctype.h>
 #include <cuda_runtime.h>
+#define EFA_NIC_DUP_COUNT 8
 #endif
 
 static uint32_t libversion = 0;
@@ -1198,20 +1199,23 @@ static ncclResult_t ofi_init(ncclDebugLogger_t logFunction)
 	 * emulate a NIC per GPU so that NCCL will build more rings and achieve
 	 * better peak BW.
 	*/
-	if (IS_EFA_PROVIDER(ofi_info_list->fabric_attr->prov_name) && !support_gdr) {
+	if (!IS_EFA_PROVIDER(ofi_info_list->fabric_attr->prov_name)) {
+		NCCL_OFI_WARN("Only EFA provider is supported");
+		ret = ncclSystemError;
+		goto exit;
+	}
+	if (!support_gdr && !is_p4) {
 		if (cudaGetDeviceCount(&ofi_ndevices) != cudaSuccess) {
 			NCCL_OFI_WARN("Error getting CUDA device count");
 			ret = ncclUnhandledCudaError;
 			goto exit;
 		}
-		ofi_ndevices /= 2;
-		// Make the list cyclic to emulate having multiple devices
-		ofi_info_list->next = ofi_info_list;
-		NCCL_OFI_INFO(NCCL_INIT, "Forcing AWS OFI ndev %d", ofi_ndevices);
-	} else if (!IS_EFA_PROVIDER(ofi_info_list->fabric_attr->prov_name)) {
-		NCCL_OFI_WARN("Only EFA provider is supported");
-		ret = ncclSystemError;
-		goto exit;
+		if (ofi_ndevices > 1) {
+			ofi_ndevices /= 2;
+			// Make the list cyclic to emulate having multiple devices
+			ofi_info_list->next = ofi_info_list;
+			NCCL_OFI_INFO(NCCL_INIT, "Forcing AWS OFI ndev %d", ofi_ndevices);
+		}
 	}
 #else
 	/* If TCP provider is selected, filter out unnecessary interfaces and address formats */
